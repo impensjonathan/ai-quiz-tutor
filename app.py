@@ -145,10 +145,6 @@ def load_and_process_document(file_path):
 st.set_page_config(layout="centered", page_title="AI Insurance Quiz")
 st.title("AI Quiz Tutor: Insurance Principles")
 
-# --- Link to Source Document ---
-pdf_url = "https://1drv.ms/b/c/9aaa7212512806a8/EYxZ3zEYLJZJte0yxe-QNzkBsLZmR_sjWfATbavqgOHDtA?e=KUOOBu" # User's link
-st.caption(f"Find the document [here]({pdf_url})")
-
 # --- LLM Setup ---
 if 'llm_configured' not in st.session_state: st.session_state.llm_configured = False
 if 'gemini_model' not in st.session_state: st.session_state.gemini_model = None
@@ -177,15 +173,18 @@ st.session_state.setdefault('total_questions_answered', 0)
 st.session_state.setdefault('show_summary', False)
 
 # --- Display Initial Status Messages ---
+# <<< Status messages remain commented out >>>
 if 'initial_status_shown' not in st.session_state:
-     # <<< Status messages remain commented out as per user's last provided code >>>
-     # if st.session_state.llm_configured:
-     #     st.success("AI Model configured successfully!")
-     # if st.session_state.doc_chunks:
-     #     st.success(f"Document '{DOCUMENT_PATH}' loaded and processed.")
-     st.session_state.initial_status_shown = True
+    # if st.session_state.llm_configured:
+    #     st.success("AI Model configured successfully!")
+    # if st.session_state.doc_chunks:
+    #     st.success(f"Document '{DOCUMENT_PATH}' loaded and processed.")
+    st.session_state.initial_status_shown = True
 
 # --- App Logic ---
+
+# <<< Define PDF URL before using it >>>
+pdf_url = "https://1drv.ms/b/c/9aaa7212512806a8/EYxZ3zEYLJZJte0yxe-QNzkBsLZmR_sjWfATbavqgOHDtA?e=KUOOBu" # User's link
 
 # Condition 0: Show Summary Report
 if st.session_state.show_summary:
@@ -195,60 +194,51 @@ if st.session_state.show_summary:
     num_incorrect = len(incorrect_list)
     num_correct = total_answered - num_incorrect
 
-    # <<< Summary UI Refinement: Use columns for score display >>>
-    col1, col2 = st.columns([1, 3]) # Allocate space: 1 part for metric, 3 for text
+    # Using columns for score display
+    col1, col2 = st.columns([1, 3])
     with col1:
          if total_answered > 0:
               score_percent = (num_correct / total_answered) * 100
-              st.metric(label="Your Score", value=f"{score_percent:.1f}%") # Display score %
+              st.metric(label="Your Score", value=f"{score_percent:.1f}%")
          else:
-              st.metric(label="Your Score", value="N/A") # Handle no answers
-
+              st.metric(label="Your Score", value="N/A")
     with col2:
-         # Display counts clearly
          st.write(f"**Total Questions Answered:** {total_answered}")
          st.write(f"**Correct:** {num_correct}")
          st.write(f"**Incorrect:** {num_incorrect}")
-    # <<< End Summary UI Refinement (Columns) >>>
+    st.divider()
 
-    st.divider() # Visual separator
-
-    # Handle display based on incorrect answers
     if not incorrect_list and total_answered > 0 :
-        st.balloons() # Add fun element for perfect score
+        st.balloons()
         st.success("Congratulations! You answered all questions correctly.")
     elif incorrect_list:
         st.subheader("Review Incorrect Answers:")
-        # <<< Summary UI Refinement: Use expander for incorrect answers >>>
-        for i, item in enumerate(incorrect_list):
-             # Create a concise label for the expander
-             expander_label = f"Q{item['question_number']}: {item['question_text'][:60]}..." # Truncate long text
-             with st.expander(expander_label, expanded=(i==0)): # Expand only the first incorrect answer by default
-                  # Display full details inside
-                  st.error(f"**Full Question {item['question_number']}:** {item['question_text']}")
-                  st.write(f"> Your Answer: {item['your_answer']}")
-                  st.write(f"> Correct Answer: {item['correct_answer']}")
-                  st.caption(f"Explanation: {item['explanation']}")
-        # <<< End Summary UI Refinement (Expander) >>>
+        # Display details directly without expander
+        for item in incorrect_list:
+             st.error(f"**Q{item['question_number']}: {item['question_text']}**")
+             st.write(f"> Your Answer: {item['your_answer']}")
+             st.write(f"> Correct Answer: {item['correct_answer']}")
+             st.caption(f"Explanation: {item['explanation']}")
+             st.divider()
     elif total_answered == 0:
-         st.info("You did not answer any questions.") # Message if quiz stopped before answering
+         st.info("You did not answer any questions.")
 
-    st.divider() # Visual separator
-    # Button to start over
+    st.divider()
     if st.button("Start New Quiz"):
-        # Reset all necessary states for a fresh start
-        st.session_state.quiz_started = False; st.session_state.question_number = 0
-        st.session_state.current_question_data = None; st.session_state.user_answer = None
-        st.session_state.feedback_message = None; st.session_state.show_explanation = False
-        st.session_state.last_answer_correct = None; st.session_state.incorrectly_answered_questions = []
-        st.session_state.total_questions_answered = 0; st.session_state.show_summary = False
-        # Allow initial status messages to show again if they were enabled
+        # Reset states
+        st.session_state.quiz_started = False; st.session_state.question_number = 0; st.session_state.current_question_data = None; st.session_state.user_answer = None; st.session_state.feedback_message = None; st.session_state.show_explanation = False; st.session_state.last_answer_correct = None; st.session_state.incorrectly_answered_questions = []; st.session_state.total_questions_answered = 0; st.session_state.show_summary = False
         if 'initial_status_shown' in st.session_state: del st.session_state.initial_status_shown
-        st.rerun() # Rerun the app to go back to the start screen
+        st.rerun()
 
 # Condition 1: Ready to Start Quiz
 elif st.session_state.doc_chunks and st.session_state.llm_configured and not st.session_state.quiz_started:
-    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document.") # Note: Link is under title now
+    # <<< UI Change: Separate info message and caption link >>>
+    # Display the main message in the info box
+    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document?")
+    # Display the link using st.caption on the next line (smaller font)
+    st.caption(f"Find the source document [here]({pdf_url})")
+    # <<< End UI Change >>>
+
     if st.button("Start Quiz!", type="primary"):
         print("--- Start Quiz Button Clicked ---")
         st.session_state.quiz_started = True; st.session_state.question_number = 1
@@ -265,7 +255,7 @@ elif st.session_state.doc_chunks and st.session_state.llm_configured and not st.
 
 # Condition 2: Quiz in Progress
 elif st.session_state.quiz_started:
-    # Use container for quiz area (already implemented)
+    # Use container for quiz area
     quiz_container = st.container(border=True)
     with quiz_container:
         if st.session_state.current_question_data:
