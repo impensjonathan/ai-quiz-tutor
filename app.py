@@ -145,6 +145,10 @@ def load_and_process_document(file_path):
 st.set_page_config(layout="centered", page_title="AI Insurance Quiz")
 st.title("AI Quiz Tutor: Insurance Principles")
 
+# --- Link to Source Document ---
+pdf_url = "https://1drv.ms/b/c/9aaa7212512806a8/EYxZ3zEYLJZJte0yxe-QNzkBsLZmR_sjWfATbavqgOHDtA?e=KUOOBu" # User's link
+st.caption(f"Find the document [here]({pdf_url})")
+
 # --- LLM Setup ---
 if 'llm_configured' not in st.session_state: st.session_state.llm_configured = False
 if 'gemini_model' not in st.session_state: st.session_state.gemini_model = None
@@ -160,7 +164,6 @@ except KeyError as ke: st.error(f"{ke} Check `.streamlit/secrets.toml`."); st.se
 except Exception as e: st.error(f"AI Model Config Error: {type(e).__name__}: {e}"); st.session_state.llm_configured = False
 
 # --- Initialize Other Streamlit Session State Variables ---
-# Use .setdefault() for cleaner initialization
 st.session_state.setdefault('doc_chunks', load_and_process_document(DOCUMENT_PATH) if st.session_state.get('llm_configured', False) else None)
 st.session_state.setdefault('quiz_started', False)
 st.session_state.setdefault('current_question_data', None)
@@ -170,18 +173,21 @@ st.session_state.setdefault('feedback_message', None)
 st.session_state.setdefault('show_explanation', False)
 st.session_state.setdefault('last_answer_correct', None)
 st.session_state.setdefault('incorrectly_answered_questions', [])
-st.session_state.setdefault('total_questions_answered', 0) # New state for tracking total
-st.session_state.setdefault('show_summary', False) # New state to trigger summary display
+st.session_state.setdefault('total_questions_answered', 0)
+st.session_state.setdefault('show_summary', False)
 
 # --- Display Initial Status Messages ---
 if 'initial_status_shown' not in st.session_state:
-     if st.session_state.llm_configured: st.success("AI Model configured successfully!")
-     if st.session_state.doc_chunks: st.success(f"Document '{DOCUMENT_PATH}' loaded and processed.")
+     # <<< Status messages remain commented out as per user's last provided code >>>
+     # if st.session_state.llm_configured:
+     #     st.success("AI Model configured successfully!")
+     # if st.session_state.doc_chunks:
+     #     st.success(f"Document '{DOCUMENT_PATH}' loaded and processed.")
      st.session_state.initial_status_shown = True
 
 # --- App Logic ---
 
-# >>>>> NEW: Condition 0: Show Summary Report <<<<<
+# Condition 0: Show Summary Report
 if st.session_state.show_summary:
     st.header("Quiz Summary")
     total_answered = st.session_state.total_questions_answered
@@ -189,180 +195,171 @@ if st.session_state.show_summary:
     num_incorrect = len(incorrect_list)
     num_correct = total_answered - num_incorrect
 
-    # Calculate Score
-    if total_answered > 0:
-        score_percent = (num_correct / total_answered) * 100
-        st.metric(label="Your Score", value=f"{score_percent:.1f}%", delta=f"{num_correct}/{total_answered} Correct")
-    else:
-        st.info("No questions were answered.")
-        score_percent = 0 # Default score if no questions answered
+    # <<< Summary UI Refinement: Use columns for score display >>>
+    col1, col2 = st.columns([1, 3]) # Allocate space: 1 part for metric, 3 for text
+    with col1:
+         if total_answered > 0:
+              score_percent = (num_correct / total_answered) * 100
+              st.metric(label="Your Score", value=f"{score_percent:.1f}%") # Display score %
+         else:
+              st.metric(label="Your Score", value="N/A") # Handle no answers
 
-    st.divider()
+    with col2:
+         # Display counts clearly
+         st.write(f"**Total Questions Answered:** {total_answered}")
+         st.write(f"**Correct:** {num_correct}")
+         st.write(f"**Incorrect:** {num_incorrect}")
+    # <<< End Summary UI Refinement (Columns) >>>
 
-    # Display Incorrect Answers
-    if not incorrect_list:
-        st.balloons() # Fun element for perfect score!
+    st.divider() # Visual separator
+
+    # Handle display based on incorrect answers
+    if not incorrect_list and total_answered > 0 :
+        st.balloons() # Add fun element for perfect score
         st.success("Congratulations! You answered all questions correctly.")
-    else:
-        st.subheader("Questions Answered Incorrectly:")
-        for item in incorrect_list:
-            st.error(f"**Q{item['question_number']}: {item['question_text']}**")
-            st.write(f"> Your Answer: {item['your_answer']}")
-            st.write(f"> Correct Answer: {item['correct_answer']}")
-            st.caption(f"Explanation: {item['explanation']}")
-            st.divider()
+    elif incorrect_list:
+        st.subheader("Review Incorrect Answers:")
+        # <<< Summary UI Refinement: Use expander for incorrect answers >>>
+        for i, item in enumerate(incorrect_list):
+             # Create a concise label for the expander
+             expander_label = f"Q{item['question_number']}: {item['question_text'][:60]}..." # Truncate long text
+             with st.expander(expander_label, expanded=(i==0)): # Expand only the first incorrect answer by default
+                  # Display full details inside
+                  st.error(f"**Full Question {item['question_number']}:** {item['question_text']}")
+                  st.write(f"> Your Answer: {item['your_answer']}")
+                  st.write(f"> Correct Answer: {item['correct_answer']}")
+                  st.caption(f"Explanation: {item['explanation']}")
+        # <<< End Summary UI Refinement (Expander) >>>
+    elif total_answered == 0:
+         st.info("You did not answer any questions.") # Message if quiz stopped before answering
 
-    # Button to start a new quiz
+    st.divider() # Visual separator
+    # Button to start over
     if st.button("Start New Quiz"):
-        # Reset relevant states for a completely new quiz
-        st.session_state.quiz_started = False
-        st.session_state.question_number = 0
-        st.session_state.current_question_data = None
-        st.session_state.user_answer = None
-        st.session_state.feedback_message = None
-        st.session_state.show_explanation = False
-        st.session_state.last_answer_correct = None
-        st.session_state.incorrectly_answered_questions = []
-        st.session_state.total_questions_answered = 0
-        st.session_state.show_summary = False # Hide summary
-        if 'initial_status_shown' in st.session_state: del st.session_state.initial_status_shown # Allow status messages to show again
-        st.rerun()
+        # Reset all necessary states for a fresh start
+        st.session_state.quiz_started = False; st.session_state.question_number = 0
+        st.session_state.current_question_data = None; st.session_state.user_answer = None
+        st.session_state.feedback_message = None; st.session_state.show_explanation = False
+        st.session_state.last_answer_correct = None; st.session_state.incorrectly_answered_questions = []
+        st.session_state.total_questions_answered = 0; st.session_state.show_summary = False
+        # Allow initial status messages to show again if they were enabled
+        if 'initial_status_shown' in st.session_state: del st.session_state.initial_status_shown
+        st.rerun() # Rerun the app to go back to the start screen
 
-
-# Condition 1: Ready to Start Quiz (Check summary flag is False)
+# Condition 1: Ready to Start Quiz
 elif st.session_state.doc_chunks and st.session_state.llm_configured and not st.session_state.quiz_started:
-    # Initial status messages are shown above this block now
-    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document.")
+    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document.") # Note: Link is under title now
     if st.button("Start Quiz!", type="primary"):
         print("--- Start Quiz Button Clicked ---")
-        # Reset states for a new quiz attempt
-        st.session_state.quiz_started = True
-        st.session_state.question_number = 1
-        st.session_state.feedback_message = None
-        st.session_state.show_explanation = False
-        st.session_state.last_answer_correct = None
-        st.session_state.user_answer = None
-        st.session_state.current_question_data = None
-        st.session_state.incorrectly_answered_questions = [] # Clear list for new quiz
-        st.session_state.total_questions_answered = 0 # Reset total counter
-
+        st.session_state.quiz_started = True; st.session_state.question_number = 1
+        st.session_state.feedback_message = None; st.session_state.show_explanation = False
+        st.session_state.last_answer_correct = None; st.session_state.user_answer = None
+        st.session_state.current_question_data = None; st.session_state.incorrectly_answered_questions = []
+        st.session_state.total_questions_answered = 0
         with st.spinner("Generating the first question... please wait."):
-             question_data = generate_quiz_question(
-                 st.session_state.doc_chunks,
-                 st.session_state.gemini_model,
-                 subject=CORE_SUBJECT,
-                 difficulty="average"
-             )
+             question_data = generate_quiz_question(st.session_state.doc_chunks, st.session_state.gemini_model, subject=CORE_SUBJECT, difficulty="average")
         st.session_state.current_question_data = question_data
-
         if st.session_state.current_question_data is None:
-            st.error("Failed to generate the first question. Please try starting again.")
-            st.session_state.quiz_started = False
-            st.session_state.question_number = 0
-        else:
-            st.rerun()
+            st.error("Failed to generate first question. Try again."); st.session_state.quiz_started = False; st.session_state.question_number = 0
+        else: st.rerun()
 
 # Condition 2: Quiz in Progress
 elif st.session_state.quiz_started:
-    if st.session_state.current_question_data:
-        q_data = st.session_state.current_question_data
-        st.subheader(f"Question {st.session_state.question_number}")
-        st.markdown(q_data["question"])
+    # Use container for quiz area (already implemented)
+    quiz_container = st.container(border=True)
+    with quiz_container:
+        if st.session_state.current_question_data:
+            q_data = st.session_state.current_question_data
+            st.subheader(f"Question {st.session_state.question_number}")
+            st.markdown(f"**{q_data['question']}**")
 
-        options_dict = q_data.get("options", {})
-        options_list = [f"{key}: {options_dict.get(key, f'Error Parsing Option {key}')}" for key in ["A", "B", "C", "D"]]
+            options_dict = q_data.get("options", {})
+            options_list = [f"{key}: {options_dict.get(key, f'Error {key}')}" for key in ["A", "B", "C", "D"]]
 
-        current_selection_index = None
-        if st.session_state.show_explanation and st.session_state.user_answer:
-            try:
-                current_selection_index = [opt.startswith(f"{st.session_state.user_answer}:") for opt in options_list].index(True)
-            except ValueError: current_selection_index = None
+            current_selection_index = None
+            if st.session_state.show_explanation and st.session_state.user_answer:
+                try: current_selection_index = [opt.startswith(f"{st.session_state.user_answer}:") for opt in options_list].index(True)
+                except ValueError: current_selection_index = None
 
-        selected_option_display = st.radio(
-            "Choose your answer:", options_list, index=current_selection_index,
-            key=f"question_{st.session_state.question_number}_options",
-            disabled=st.session_state.show_explanation
-        )
+            selected_option_display = st.radio(
+                "Choose your answer:", options_list, index=current_selection_index,
+                key=f"question_{st.session_state.question_number}_options",
+                disabled=st.session_state.show_explanation,
+                label_visibility="collapsed"
+            )
 
-        if not st.session_state.show_explanation:
-            if selected_option_display and ":" in selected_option_display:
-                st.session_state.user_answer = selected_option_display.split(":")[0]
-            else: st.session_state.user_answer = None
+            if not st.session_state.show_explanation:
+                if selected_option_display and ":" in selected_option_display: st.session_state.user_answer = selected_option_display.split(":")[0]
+                else: st.session_state.user_answer = None
 
-        st.write("---")
-        submit_button = st.button("Submit Answer", disabled=st.session_state.show_explanation)
+            st.write("---")
+            submit_button_type = "primary" if not st.session_state.show_explanation else "secondary"
+            submit_button = st.button("Submit Answer", disabled=st.session_state.show_explanation, type=submit_button_type)
 
-        if submit_button:
-            if st.session_state.user_answer is None: st.warning("Please select an answer."); st.stop()
-            else:
-                # Increment total answered count here
-                st.session_state.total_questions_answered += 1
-                correct_answer_letter = q_data.get("correct_answer", "Error")
-                if correct_answer_letter == "Error":
-                     st.error("Could not determine correct answer."); st.session_state.feedback_message = "Error: Cannot check answer."; st.session_state.last_answer_correct = None
-                elif st.session_state.user_answer == correct_answer_letter:
-                    st.session_state.feedback_message = "Correct!"; st.session_state.last_answer_correct = True
+            if submit_button:
+                if st.session_state.user_answer is None: st.warning("Please select an answer."); st.stop()
                 else:
-                    st.session_state.feedback_message = f"Incorrect. Correct: **{correct_answer_letter}**."; st.session_state.last_answer_correct = False
-                    st.session_state.incorrectly_answered_questions.append({ # Add details to list
-                         "question_number": st.session_state.question_number, "question_text": q_data["question"],
-                         "your_answer": st.session_state.user_answer, "correct_answer": correct_answer_letter,
-                         "explanation": q_data.get("explanation", "N/A")
-                    })
-                st.session_state.show_explanation = True
-                print(f"--- Q{st.session_state.question_number} Submitted: User={st.session_state.user_answer}, Correct={correct_answer_letter}, Result={st.session_state.last_answer_correct} ---")
+                    st.session_state.total_questions_answered += 1
+                    correct_answer_letter = q_data.get("correct_answer", "Error")
+                    if correct_answer_letter == "Error":
+                         st.error("Could not check answer."); st.session_state.feedback_message = "Error"; st.session_state.last_answer_correct = None
+                    elif st.session_state.user_answer == correct_answer_letter:
+                        st.session_state.feedback_message = "Correct!"; st.session_state.last_answer_correct = True
+                    else:
+                        st.session_state.feedback_message = f"Incorrect. Correct: **{correct_answer_letter}**."; st.session_state.last_answer_correct = False
+                        st.session_state.incorrectly_answered_questions.append({
+                             "question_number": st.session_state.question_number, "question_text": q_data["question"],
+                             "your_answer": st.session_state.user_answer, "correct_answer": correct_answer_letter,
+                             "explanation": q_data.get("explanation", "N/A")})
+                    st.session_state.show_explanation = True
+                    print(f"--- Q{st.session_state.question_number} Sub: User={st.session_state.user_answer}, Correct={correct_answer_letter}, Result={st.session_state.last_answer_correct} ---")
+                    st.rerun()
+
+            # --- Display Feedback and Explanation ---
+            feedback_container = st.container()
+            with feedback_container:
+                 if st.session_state.feedback_message:
+                     if st.session_state.last_answer_correct is True: st.success(st.session_state.feedback_message)
+                     elif st.session_state.last_answer_correct is False: st.error(st.session_state.feedback_message)
+                     else: st.warning(st.session_state.feedback_message)
+
+                     if st.session_state.show_explanation:
+                         explanation_text = q_data.get("explanation", "No explanation provided.")
+                         st.caption(f"Explanation: {explanation_text}")
+
+                     # --- Next Question Button ---
+                     if st.button("Next Question"):
+                         print("--- Next Q Button Clicked ---");
+                         next_difficulty = "harder" if st.session_state.last_answer_correct else "simpler"
+                         print(f"Requesting {next_difficulty} q.")
+                         st.session_state.feedback_message = None; st.session_state.show_explanation = False
+                         st.session_state.user_answer = None; st.session_state.last_answer_correct = None
+                         with st.spinner(f"Generating {next_difficulty} question..."):
+                              next_q_data = generate_quiz_question(st.session_state.doc_chunks, st.session_state.gemini_model, subject=CORE_SUBJECT, difficulty=next_difficulty)
+                         if next_q_data:
+                              st.session_state.current_question_data = next_q_data; st.session_state.question_number += 1; print(f"New Q generated. Moving to Q{st.session_state.question_number}"); st.rerun()
+                         else: st.error(f"Failed to generate {next_difficulty} question."); st.stop()
+
+            # --- Stop Quiz Button ---
+            st.divider()
+            if st.button("Stop Quiz"):
+                print("--- Stop Quiz Button Clicked ---")
+                st.session_state.show_summary = True
+                st.session_state.quiz_started = False
                 st.rerun()
 
-        # --- Display Feedback and Explanation ---
-        if st.session_state.feedback_message:
-            if st.session_state.last_answer_correct is True: st.success(st.session_state.feedback_message)
-            elif st.session_state.last_answer_correct is False: st.error(st.session_state.feedback_message)
-            else: st.warning(st.session_state.feedback_message) # Error case
+        else:
+            # Handles case: quiz started but question data missing
+            st.error("Quiz active, but no question data. Error during generation? Stop/restart.")
+            if st.button("Stop Quiz"):
+                 # Reset fully on error stop
+                 st.session_state.quiz_started = False; st.session_state.question_number = 0; st.session_state.current_question_data = None; st.session_state.user_answer = None; st.session_state.feedback_message = None; st.session_state.show_explanation = False; st.session_state.last_answer_correct = None; st.session_state.incorrectly_answered_questions = []; st.session_state.total_questions_answered = 0; st.session_state.show_summary = False
+                 if 'initial_status_shown' in st.session_state: del st.session_state.initial_status_shown
+                 st.rerun()
 
-            if st.session_state.show_explanation:
-                explanation_text = q_data.get("explanation", "No explanation provided.")
-                st.info(f"Explanation: {explanation_text}")
-
-            # --- Next Question Button ---
-            if st.button("Next Question"):
-                print("--- Next Question Button Clicked ---")
-                next_difficulty = "harder" if st.session_state.last_answer_correct else "simpler"
-                print(f"Requesting {next_difficulty} question.")
-                # Reset feedback states
-                st.session_state.feedback_message = None; st.session_state.show_explanation = False
-                st.session_state.user_answer = None; st.session_state.last_answer_correct = None
-                with st.spinner(f"Generating a {next_difficulty} question..."):
-                     next_question_data = generate_quiz_question(st.session_state.doc_chunks, st.session_state.gemini_model, subject=CORE_SUBJECT, difficulty=next_difficulty)
-                if next_question_data:
-                     st.session_state.current_question_data = next_question_data
-                     st.session_state.question_number += 1
-                     print(f"New question generated. Moving to Q{st.session_state.question_number}")
-                     st.rerun()
-                else:
-                     st.error(f"Failed to generate {next_difficulty} question. Try again or stop."); st.stop()
-
-        # --- Stop Quiz Button ---
-        st.divider() # Use divider for visual separation
-        if st.button("Stop Quiz"):
-            print("--- Stop Quiz Button Clicked ---")
-            # Don't reset everything, just set summary flag
-            st.session_state.show_summary = True
-            st.session_state.quiz_started = False # Indicate quiz itself is no longer active
-            # Keep score related states: total_questions_answered, incorrectly_answered_questions
-            st.rerun() # Rerun to show the summary
-
-    else:
-        # Handles case where quiz started but question data is missing
-        st.error("Quiz active, but no question data. Error during generation? Please stop and restart.")
-        if st.button("Stop Quiz"):
-             # Reset state variables fully for stop after error
-             st.session_state.quiz_started = False; st.session_state.question_number = 0; st.session_state.current_question_data = None; st.session_state.user_answer = None; st.session_state.feedback_message = None; st.session_state.show_explanation = False; st.session_state.last_answer_correct = None; st.session_state.incorrectly_answered_questions = []; st.session_state.total_questions_answered = 0; st.session_state.show_summary = False
-             if 'initial_status_shown' in st.session_state: del st.session_state.initial_status_shown
-             st.rerun()
 
 # Condition 3: Setup Failed
 else:
-    # Give specific feedback based on which setup step failed
     if not st.session_state.llm_configured: st.warning("AI Model configuration failed.")
     elif not st.session_state.doc_chunks: st.warning("Document processing failed.")
     else: st.error("Unknown setup error.")
