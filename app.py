@@ -201,7 +201,7 @@ if st.session_state.show_summary:
 # Condition 1: Ready to Start Quiz
 elif st.session_state.doc_chunks and st.session_state.llm_configured and not st.session_state.quiz_started:
     # <<< UI Change: Info box DOES NOT contain the link anymore >>>
-    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document.")
+    st.info(f"Ready to test your knowledge on '{CORE_SUBJECT}' based on this document?")
     # <<< Link is displayed above using st.caption, right below st.title >>>
     if st.button("Start Quiz!", type="primary"):
         print("--- Start Quiz Clicked ---")
